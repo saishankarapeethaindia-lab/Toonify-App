@@ -1,4 +1,4 @@
-name: Android Build
+lname: Android Build
 on:
   workflow_dispatch:
 jobs:
@@ -6,16 +6,50 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
       - name: set up JDK 8
         uses: actions/setup-java@v4
         with:
           java-version: '8'
           distribution: 'temurin'
           cache: gradle
+          
+      - name: THE NUCLEAR OVERRIDE (Forced Dependency Resolution)
+        run: |
+          # 1. Instantly rewrite the root build.gradle to use Aliyun Mirrors
+          cat << 'EOF' > build.gradle
+          ext { sourceCompatibility = 1.8 }
+          buildscript {
+              repositories {
+                  google()
+                  mavenCentral()
+                  maven { url 'https://maven.aliyun.com/repository/jcenter' }
+                  maven { url 'https://maven.aliyun.com/repository/public' }
+                  maven { url 'https://jitpack.io' }
+              }
+              dependencies { classpath 'com.android.tools.build:gradle:3.6.1' }
+          }
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+                  maven { url 'https://maven.aliyun.com/repository/jcenter' }
+                  maven { url 'https://maven.aliyun.com/repository/public' }
+                  maven { url 'https://jitpack.io' }
+              }
+          }
+          task clean(type: Delete) { delete rootProject.buildDir }
+          EOF
+          
+          # 2. Forcibly inject the mirrors into the app module's configuration
+          sed -i '1i repositories { google(); mavenCentral(); maven { url "https://maven.aliyun.com/repository/jcenter" }; maven { url "https://maven.aliyun.com/repository/public" }; maven { url "https://jitpack.io" } }' app/build.gradle
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
+        
       - name: Build with Gradle
         run: ./gradlew assembleDebug
+        
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
